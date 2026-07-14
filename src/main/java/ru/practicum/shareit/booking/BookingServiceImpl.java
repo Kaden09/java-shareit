@@ -1,10 +1,10 @@
 package ru.practicum.shareit.booking;
 
-import jakarta.transaction.Transactional;
 import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.dto.BookingDto;
 import ru.practicum.shareit.booking.dto.BookingResponseDto;
 import ru.practicum.shareit.exception.NotFoundException;
@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional(readOnly = true)
 @Slf4j
 public class BookingServiceImpl implements BookingService {
 
@@ -158,7 +158,9 @@ public class BookingServiceImpl implements BookingService {
         }
 
         log.info("Найдено бронирований создателя с id:{} в состоянии {}: {}", userId, state, bookings.size());
-        return bookings.stream().map(BookingMapper::toBookingResponseDto).collect(Collectors.toList());
+        return bookings.stream()
+                .map(BookingMapper::toBookingResponseDto)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -199,7 +201,9 @@ public class BookingServiceImpl implements BookingService {
         }
 
         log.info("Найдено бронирований владельца с id:{} в состоянии {}: {}", userId, state, bookings.size());
-        return bookings.stream().map(BookingMapper::toBookingResponseDto).collect(Collectors.toList());
+        return bookings.stream()
+                .map(BookingMapper::toBookingResponseDto)
+                .collect(Collectors.toList());
     }
 
     private BookingState parseState(String state) {

@@ -1,10 +1,10 @@
 package ru.practicum.shareit.item;
 
-import jakarta.transaction.Transactional;
 import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.Booking;
 import ru.practicum.shareit.booking.BookingRepository;
 import ru.practicum.shareit.booking.BookingStatus;
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
+@Transactional(readOnly = true)
 public class ItemServiceImpl implements ItemService {
     private final ItemRepository itemRepository;
     private final UserRepository userRepository;
@@ -156,7 +156,9 @@ public class ItemServiceImpl implements ItemService {
         ItemDto dto = ItemMapper.toItemDto(item);
 
         List<CommentDto> comments = commentRepository.findAllByItemId(item.getId())
-                .stream().map(CommentMapper::toCommentDto).collect(Collectors.toList());
+                .stream()
+                .map(CommentMapper::toCommentDto)
+                .collect(Collectors.toList());
         dto.setComments(comments);
         log.debug("Добавлено комментариев к ItemDto: {}", comments.size());
 
