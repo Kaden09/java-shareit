@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import ru.practicum.shareit.item.dto.CommentDto;
 import ru.practicum.shareit.item.dto.ItemDto;
 
 import java.util.List;
@@ -40,23 +41,33 @@ public class ItemController {
     }
 
     @GetMapping("/{itemId}")
-    public ItemDto getById(@PathVariable Long itemId) {
+    public ItemDto getById(@PathVariable Long itemId, @RequestHeader(USER_ID_HEADER) Long userId) {
         log.info("Запрос на получение данных о вещи с id:{}; (GET /items/{})", itemId, itemId);
 
-        return itemService.getById(itemId);
+        return itemService.getById(itemId, userId);
     }
 
     @GetMapping
     public List<ItemDto> getAllByUserId(@RequestHeader(USER_ID_HEADER) Long userId) {
-        log.info("Запрос пользователя с id:{} на получение списка всех своих вещей", userId);
+        log.info("Запрос пользователя с id:{} на получение списка всех своих вещей (GET /items)", userId);
 
-        return itemService.getAllByUserId(userId);
+        return itemService.getAllByOwnerId(userId);
     }
 
     @GetMapping("/search")
     public List<ItemDto> search(@RequestParam String text) {
-        log.info("Запрос на поиск вещей по тексту: '{}'", text);
+        log.info("Запрос на поиск вещей по тексту: '{}'; (GET /items/search)", text);
 
         return itemService.search(text);
+    }
+
+    @PostMapping("/{itemId}/comment")
+    public CommentDto addComment(@RequestHeader(USER_ID_HEADER) Long userId,
+                                 @PathVariable Long itemId,
+                                 @Valid @RequestBody CommentDto commentDto) {
+        log.info("Запрос на создание комментария к вещи с id:{} от пользователя с id:{}", itemId, userId);
+        log.debug("Данные для создания комментария: {}", commentDto);
+
+        return itemService.addComment(userId, itemId, commentDto);
     }
 }
