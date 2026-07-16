@@ -230,4 +230,60 @@ class BookingServiceImplTest {
         var result = bookingService.approve(owner.getId(), 1L, true);
         assertEquals(BookingStatus.APPROVED, result.getStatus());
     }
+
+    @Test
+    void getAllByBooker_whenStatusIsUnknown_shouldThrowException() {
+        assertThrows(RuntimeException.class, () ->
+                bookingService.getAllByBooker(1L, "WRONG_STATUS", 0, 10));
+    }
+
+    @Test
+    void approve_whenStatusIsAlreadyApproved_shouldThrowException() {
+        User owner = User.builder().id(1L).build();
+        User booker = User.builder().id(2L).build();
+
+        Item item = Item.builder().id(1L).owner(owner).build();
+
+        Booking booking = Booking.builder()
+                .id(1L)
+                .item(item)
+                .booker(booker)
+                .status(BookingStatus.APPROVED)
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+
+        assertThrows(jakarta.validation.ValidationException.class, () ->
+                bookingService.approve(1L, 1L, true));
+    }
+
+    @Test
+    void getById_whenUserIsNotOwnerOrBooker_shouldThrowNotFoundException() {
+        User owner = User.builder().id(1L).build();
+        User booker = User.builder().id(2L).build();
+        User stranger = User.builder().id(3L).build(); // Чужак
+
+        Item item = Item.builder().id(1L).owner(owner).build();
+        Booking booking = Booking.builder().id(1L).item(item).booker(booker).build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+
+        assertThrows(ru.practicum.shareit.exception.NotFoundException.class,
+                () -> bookingService.getById(3L, 1L));
+    }
+
+    @Test
+    void getById_whenBookingNotFound_shouldThrowNotFoundException() {
+        when(bookingRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> bookingService.getById(1L, 99L));
+    }
+
+    @Test
+    void getAllByBooker_whenStatusIsAll_shouldCallMethodWithAll() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(booker));
+        when(bookingRepository.findAllByBookerIdOrderByStartDesc(anyLong(), any())).thenReturn(List.of(booking));
+
+        var result = bookingService.getAllByBooker(1L, "ALL", 0, 10);
+        assertFalse(result.isEmpty());
+    }
 }

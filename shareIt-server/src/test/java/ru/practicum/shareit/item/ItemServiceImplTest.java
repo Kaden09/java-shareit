@@ -252,4 +252,41 @@ class ItemServiceImplTest {
         ItemDto result = itemService.update(1L, 1L, updateDto);
         assertTrue(result.getAvailable());
     }
+
+    @Test
+    void update_whenNameAndDescAreNull_shouldUpdateOnlyAvailable() {
+        User owner = User.builder().id(1L).build();
+        Item item = Item.builder().id(1L).name("Дрель").description("Старое описание").available(true).owner(owner).build();
+
+        ItemDto updateDto = ItemDto.builder().available(false).build();
+
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(itemRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ItemDto result = itemService.update(1L, 1L, updateDto);
+
+        assertEquals("Дрель", result.getName());
+        assertEquals("Старое описание", result.getDescription());
+        assertFalse(result.getAvailable());
+    }
+
+    @Test
+    void getById_whenItemNotFound_shouldThrowNotFoundException() {
+        when(itemRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> itemService.getById(99L, 1L));
+    }
+
+    @Test
+    void update_whenNameIsNull_shouldUpdateOtherFields() {
+        User owner = User.builder().id(1L).build();
+        Item item = Item.builder().id(1L).name("Старое").description("Описание").available(true).owner(owner).build();
+        ItemDto updateDto = ItemDto.builder().description("Новое").build(); // name = null
+
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(itemRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ItemDto result = itemService.update(1L, 1L, updateDto);
+        assertEquals("Старое", result.getName());
+        assertEquals("Новое", result.getDescription());
+    }
 }
