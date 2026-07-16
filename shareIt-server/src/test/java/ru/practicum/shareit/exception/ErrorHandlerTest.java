@@ -1,7 +1,9 @@
 package ru.practicum.shareit.exception;
 
 import org.junit.jupiter.api.Test;
+
 import java.lang.reflect.Method;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class ErrorHandlerTest {
@@ -32,7 +34,8 @@ class ErrorHandlerTest {
                         } catch (Exception ex) {
                             try {
                                 exceptionInstance = paramType.getConstructor().newInstance();
-                            } catch (Exception ignored) {}
+                            } catch (Exception ignored) {
+                            }
                         }
                     }
 
