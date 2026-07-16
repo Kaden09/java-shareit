@@ -105,4 +105,18 @@ class BookingControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()", is(1)));
     }
+
+    @Test
+    void getAllByOwner_shouldReturnList() throws Exception {
+        when(bookingService.getAllByOwner(anyLong(), anyString(), any(), any())).thenReturn(List.of(responseDto));
+
+        mvc.perform(get("/bookings/owner")
+                        .header(USER_ID_HEADER, 1L)
+                        .param("state", "ALL")
+                        .param("from", "0")
+                        .param("size", "10")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)));
+    }
 }

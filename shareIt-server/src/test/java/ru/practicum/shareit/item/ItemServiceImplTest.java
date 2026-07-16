@@ -233,4 +233,23 @@ class ItemServiceImplTest {
                 itemService.addComment(1L, 1L, commentDto)
         );
     }
+
+    @Test
+    void search_whenTextIsEmpty_shouldReturnEmptyList() {
+        List<ItemDto> result = itemService.search("", 0, 10);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void update_whenItemAvailableIsNull_shouldNotUpdateAvailable() {
+        User owner = User.builder().id(1L).build();
+        Item item = Item.builder().id(1L).available(true).owner(owner).build();
+        ItemDto updateDto = ItemDto.builder().name("New name").build();
+
+        when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(itemRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ItemDto result = itemService.update(1L, 1L, updateDto);
+        assertTrue(result.getAvailable());
+    }
 }

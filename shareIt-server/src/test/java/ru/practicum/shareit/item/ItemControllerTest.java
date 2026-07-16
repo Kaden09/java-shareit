@@ -7,6 +7,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import ru.practicum.shareit.item.dto.CommentDto;
 import ru.practicum.shareit.item.dto.ItemDto;
 
 import java.nio.charset.StandardCharsets;
@@ -69,5 +70,30 @@ class ItemControllerTest {
                 .andExpect(jsonPath("$.length()", is(1)))
                 .andExpect(jsonPath("$[0].id", is(itemDto.getId()), Long.class))
                 .andExpect(jsonPath("$[0].name", is(itemDto.getName())));
+    }
+
+    @Test
+    void getItemById_shouldReturnItem() throws Exception {
+        ItemDto itemDto = ItemDto.builder().id(1L).name("Дрель").build();
+        when(itemService.getById(anyLong(), anyLong())).thenReturn(itemDto);
+
+        mvc.perform(get("/items/1")
+                        .header("X-Sharer-User-Id", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(1)));
+    }
+
+    @Test
+    void addComment_shouldReturnComment() throws Exception {
+        CommentDto commentDto = CommentDto.builder().id(1L).text("Отличная дрель").build();
+        when(itemService.addComment(anyLong(), anyLong(), any())).thenReturn(commentDto);
+
+        mvc.perform(post("/items/1/comment")
+                        .content(mapper.writeValueAsString(commentDto))
+                        .characterEncoding(StandardCharsets.UTF_8)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Sharer-User-Id", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.text", is("Отличная дрель")));
     }
 }

@@ -214,4 +214,20 @@ class BookingServiceImplTest {
         assertFalse(bookingService.getAllByOwner(2L, "FUTURE", 0, 10).isEmpty());
         assertFalse(bookingService.getAllByOwner(2L, "CURRENT", 0, 10).isEmpty());
     }
+
+    @Test
+    void getAllByBooker_withUnsupportedState_shouldThrowException() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(booker));
+        assertThrows(RuntimeException.class, () -> bookingService.getAllByBooker(1L, "UNSUPPORTED", 0, 10));
+    }
+
+    @Test
+    void approve_whenStatusIsWaiting_shouldSetApproved() {
+        booking.setStatus(BookingStatus.WAITING);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        var result = bookingService.approve(owner.getId(), 1L, true);
+        assertEquals(BookingStatus.APPROVED, result.getStatus());
+    }
 }
