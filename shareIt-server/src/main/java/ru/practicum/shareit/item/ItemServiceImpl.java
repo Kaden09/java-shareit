@@ -1,0 +1,213 @@
+package ru.practicum.shareit.item;
+
+import jakarta.validation.ValidationException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.shareit.booking.Booking;
+import ru.practicum.shareit.booking.BookingRepository;
+import ru.practicum.shareit.booking.BookingStatus;
+import ru.practicum.shareit.booking.dto.BookingShortDto;
+import ru.practicum.shareit.exception.NotFoundException;
+import ru.practicum.shareit.item.dto.CommentDto;
+import ru.practicum.shareit.item.dto.ItemDto;
+import ru.practicum.shareit.item.model.Comment;
+import ru.practicum.shareit.item.model.Item;
+import ru.practicum.shareit.request.ItemRequest;
+import ru.practicum.shareit.request.ItemRequestRepository;
+import ru.practicum.shareit.user.User;
+import ru.practicum.shareit.user.UserRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional(readOnly = true)
+public class ItemServiceImpl implements ItemService {
+    private final ItemRepository itemRepository;
+    private final UserRepository userRepository;
+    private final CommentRepository commentRepository;
+    private final BookingRepository bookingRepository;
+    private final ItemRequestRepository itemRequestRepository;
+
+    @Override
+    @Transactional
+    public ItemDto create(Long userId, ItemDto itemDto) {
+        log.info("Начало процесса создания вещи для пользователя с id:{}", userId);
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.warn("Ошибка создания вещи: пользователь с id:{} не найден", userId);
+                    return new NotFoundException("Пользователь не найден");
+                });
+
+        Item item = ItemMapper.toItem(itemDto);
+        item.setOwner(owner);
+
+        if (itemDto.getRequestId() != null) {
+            ItemRequest request = itemRequestRepository.findById(itemDto.getRequestId())
+                    .orElseThrow(() -> new NotFoundException("Не найден запрос с id: " + itemDto.getRequestId()));
+            item.setRequest(request);
+        }
+
+        Item savedItem = itemRepository.save(item);
+
+        log.info("Вещь успешно создана с id:{} для владельца с id:{}", savedItem.getId(), userId);
+        return ItemMapper.toItemDto(savedItem);
+    }
+
+    @Override
+    @Transactional
+    public ItemDto update(Long userId, Long itemId, ItemDto itemDto) {
+        log.info("Начало обновления вещи с id:{} пользователем с id:{}", itemId, userId);
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> {
+                    log.warn("Ошибка обновления: вещь с id={} не найдена", itemId);
+                    return new NotFoundException("Вещь не найдена");
+                });
+
+        if (!item.getOwner().getId().equals(userId)) {
+            log.warn("Ошибка обновления: пользователь с id:{} не является владельцем вещи с id:{}", userId, itemId);
+            throw new NotFoundException("Пользователь не является владельцем вещи");
+        }
+
+        if (itemDto.getName() != null && !itemDto.getName().isBlank()) {
+            log.debug("Обновление имени вещи с id:{} : {} -> {}", itemId, item.getName(), itemDto.getName());
+            item.setName(itemDto.getName());
+        }
+        if (itemDto.getDescription() != null && !itemDto.getDescription().isBlank()) {
+            log.debug("Обновление описания вещи с id:{}", itemId);
+            item.setDescription(itemDto.getDescription());
+        }
+        if (itemDto.getAvailable() != null) {
+            log.debug("Обновление статуса доступности вещи с id:{}: {}", itemId, itemDto.getAvailable());
+            item.setAvailable(itemDto.getAvailable());
+        }
+
+        ItemDto updatedItem = ItemMapper.toItemDto(itemRepository.save(item));
+        log.info("Вещь с id:{} успешно обновлена", itemId);
+        return updatedItem;
+    }
+
+    @Override
+    public ItemDto getById(Long itemId, Long userId) {
+        log.info("Запрос вещи с id:{} от пользователя с id={}", itemId, userId);
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> {
+                    log.warn("Ошибка получения: вещь с id:{} не найдена", itemId);
+                    return new NotFoundException("Вещь не найдена");
+                });
+        return constructItemDto(item, userId);
+    }
+
+    @Override
+    public List<ItemDto> getAllByOwnerId(Long userId, Integer from, Integer size) {
+        log.info("Запрос списка всех вещей владельца с id:{}", userId);
+        if (from != null && size != null) {
+            if (from < 0 || size <= 0) {
+                throw new ValidationException("Невалидные данные пагинации");
+            }
+        }
+
+        Pageable pageable = (from != null && size != null)
+                ? PageRequest.of(from / size, size, Sort.by("id").ascending())
+                : Pageable.unpaged();
+
+        List<Item> items = itemRepository.findAllByOwnerIdOrderByIdAsc(userId, pageable);
+
+        return items.stream()
+                .map(ItemMapper::toItemDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ItemDto> search(String text, Integer from, Integer size) {
+        log.info("Запрос поиска вещей по тексту: '{}'", text);
+        if (text == null || text.isBlank()) {
+            log.debug("Текст поиска пустой, возвращен пустой список");
+            return Collections.emptyList();
+        }
+        if (from != null && size != null) {
+            if (from < 0 || size <= 0) {
+                throw new ValidationException("Невалидные данные пагинации");
+            }
+        }
+        Pageable pageable = (from != null && size != null)
+                ? PageRequest.of(from / size, size)
+                : Pageable.unpaged();
+
+        return itemRepository.search(text, pageable).stream()
+                .map(ItemMapper::toItemDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public CommentDto addComment(Long userId, Long itemId, CommentDto commentDto) {
+        log.info("Пользователь с id:{} пытается оставить комментарий к вещи с id:{}", userId, itemId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.warn("Ошибка добавления комментария: пользователь с id:{} не найден", userId);
+                    return new NotFoundException("Пользователь не найден");
+                });
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> {
+                    log.warn("Ошибка добавления комментария: вещь с id:{} не найдена", itemId);
+                    return new NotFoundException("Вещь не найдена");
+                });
+
+        Booking booking = bookingRepository.findFirstByItemIdAndBookerIdAndStatusAndEndBefore(
+                        itemId, userId, BookingStatus.APPROVED, LocalDateTime.now())
+                .orElseThrow(() -> {
+                    log.warn("Ошибка добавления комментария: у пользователя с id:{} нет завершенных бронирований для вещи с id:{}", userId, itemId);
+                    return new ValidationException("Нельзя оставить комментарий без завершенной аренды");
+                });
+
+        Comment comment = Comment.builder()
+                .text(commentDto.getText())
+                .item(item)
+                .author(user)
+                .created(LocalDateTime.now())
+                .build();
+
+        CommentDto savedComment = CommentMapper.toCommentDto(commentRepository.save(comment));
+        log.info("Комментарий с id:{} успешно добавлен к вещи с id:{}", savedComment.getId(), itemId);
+        return savedComment;
+    }
+
+    private ItemDto constructItemDto(Item item, Long userId) {
+        log.debug("Сборка ItemDto для вещи с id:{} (запрос от пользователя с id:{})", item.getId(), userId);
+        ItemDto dto = ItemMapper.toItemDto(item);
+
+        List<CommentDto> comments = commentRepository.findAllByItemId(item.getId())
+                .stream()
+                .map(CommentMapper::toCommentDto)
+                .collect(Collectors.toList());
+        dto.setComments(comments);
+        log.debug("Добавлено комментариев к ItemDto: {}", comments.size());
+
+        if (item.getOwner().getId().equals(userId)) {
+            log.debug("Пользователь с id:{} является владельцем вещи с id:{}, добавляем информацию о бронированиях", userId, item.getId());
+            LocalDateTime now = LocalDateTime.now();
+            bookingRepository.findFirstByItemIdAndStatusAndStartBeforeOrderByStartDesc(item.getId(), BookingStatus.APPROVED, now)
+                    .ifPresent(b -> {
+                        dto.setLastBooking(new BookingShortDto(b.getId(), b.getBooker().getId()));
+                        log.debug("Добавлено последнее бронирование с id:{}", b.getId());
+                    });
+
+            bookingRepository.findFirstByItemIdAndStatusAndStartAfterOrderByStartAsc(item.getId(), BookingStatus.APPROVED, now)
+                    .ifPresent(b -> {
+                        dto.setNextBooking(new BookingShortDto(b.getId(), b.getBooker().getId()));
+                        log.debug("Добавлено следующее бронирование с id:{}", b.getId());
+                    });
+        }
+        return dto;
+    }
+}
