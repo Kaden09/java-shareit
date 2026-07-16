@@ -60,4 +60,13 @@ class ItemRequestControllerTest {
                 .andExpect(jsonPath("$.length()", is(1)))
                 .andExpect(jsonPath("$[0].id", is(dto.getId()), Long.class));
     }
+
+    @Test
+    void getAllRequests_shouldReturnList() throws Exception {
+        when(requestService.getAllRequests(anyLong(), anyInt(), anyInt())).thenReturn(List.of());
+
+        mvc.perform(get("/requests/all")
+                        .header("X-Sharer-User-Id", 1L))
+                .andExpect(status().isOk());
+    }
 }
